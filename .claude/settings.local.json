@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(py --version)",
+      "Bash(where python *)",
+      "Bash(python -m venv .venv)",
+      "Bash(.venv/Scripts/python.exe -m pip install --upgrade pip --quiet)",
+      "Bash(.venv/Scripts/python.exe -m pip install -e \".[dev]\")",
+      "Bash(.venv/Scripts/python.exe -m pytest -v)",
+      "Bash(.venv/Scripts/python.exe -m app.main)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://127.0.0.1:8000/health)",
+      "Bash(curl -s -i http://127.0.0.1:8000/health)",
+      "Bash(taskkill /F /PID 27556)",
+      "PowerShell(Stop-Process -Id 27556 -Force -ErrorAction SilentlyContinue; Start-Sleep -Seconds 1; \\(Get-NetTCPConnection -LocalPort 8000 -ErrorAction SilentlyContinue | Measure-Object\\).Count)",
+      "PowerShell($env:TEST_MONGODB_URI = \"mongodb://localhost:27017\"; .\\\\.venv\\\\Scripts\\\\python.exe -m pytest -v -m integration 2>&1)",
+      "Bash(curl -s -i http://127.0.0.1:8000/health/db)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://127.0.0.1:8000/health/db)",
+      "Bash(curl -s http://127.0.0.1:8000/openapi.json)",
+      "Bash(python -c \"import sys, json; d=json.load\\(sys.stdin\\); print\\('\\\\n'.join\\(d['paths'].keys\\(\\)\\)\\)\")",
+      "PowerShell($conns = Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue; $conns | ForEach-Object { $p = Get-Process -Id $_.OwningProcess -ErrorAction SilentlyContinue; \"PID=$\\($_.OwningProcess\\) Name=$\\($p.ProcessName\\) Started=$\\($p.StartTime\\)\" })",
+      "PowerShell(Stop-Process -Id 27556 -Force -ErrorAction SilentlyContinue; Start-Sleep -Seconds 2; Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue | ForEach-Object { \"PID=$\\($_.OwningProcess\\)\" })",
+      "PowerShell(taskkill /F /PID 27556 2>&1; Start-Sleep -Seconds 2; Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue | ForEach-Object { \"PID=$\\($_.OwningProcess\\)\" })"
+    ]
+  }
+}

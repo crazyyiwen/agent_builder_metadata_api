@@ -1,0 +1,20 @@
+# Copy to config.yaml to use. Environment variables override values here.
+
+app_name: "Agent Workflow Metadata API"
+app_version: "0.1.0"
+env: dev
+log_level: INFO
+
+host: 127.0.0.1
+port: 8000
+
+cors_origins:
+  - "http://localhost:5173"
+  - "http://127.0.0.1:5173"
+
+# --- MongoDB ---
+mongodb_uri: "mongodb://localhost:27017"
+mongodb_db: "agent_workflows"
+mongodb_connect_timeout_ms: 5000
+mongodb_server_selection_timeout_ms: 5000
+mongodb_skip_startup: false
