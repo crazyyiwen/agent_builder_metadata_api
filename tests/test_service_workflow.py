@@ -89,7 +89,8 @@ def _valid_doc(workflow_id: str = "wf_x", name: str = "X") -> WorkflowDoc:
 
 
 def _invalid_doc(workflow_id: str = "wf_x", name: str = "X") -> WorkflowDoc:
-    """Missing Output node — fails default validation."""
+    """Edge target references a non-existent node — fails default validation
+    with a hard error (not a warning) so create/update reject it."""
     return WorkflowDoc.model_validate(
         {
             "id": workflow_id,
@@ -97,11 +98,15 @@ def _invalid_doc(workflow_id: str = "wf_x", name: str = "X") -> WorkflowDoc:
             "nodes": [
                 {"id": "s", "type": "start", "position": {"x": 0, "y": 0},
                  "data": {"name": "S", "config": {}}},
-                {"id": "n", "type": "llm", "position": {"x": 100, "y": 0},
-                 "data": {"name": "N", "config": {}}},
+                {"id": "o", "type": "output", "position": {"x": 100, "y": 0},
+                 "data": {"name": "O", "config": {}}},
             ],
-            "edges": [{"id": "e1", "source": "s", "target": "n",
-                       "sourceHandle": None, "targetHandle": None}],
+            "edges": [
+                {"id": "e1", "source": "s", "target": "o",
+                 "sourceHandle": None, "targetHandle": None},
+                {"id": "e2", "source": "s", "target": "ghost_node",
+                 "sourceHandle": None, "targetHandle": None},
+            ],
         }
     )
 
@@ -141,7 +146,7 @@ async def test_create_with_invalid_doc_raises_validation_error(service):
     request = CreateWorkflowRequest(name="Bad", doc=_invalid_doc())
     with pytest.raises(ValidationError) as exc:
         await service.create_workflow(request)
-    assert any(i.code == "OUTPUT_NODE_MISSING" for i in exc.value.issues)
+    assert any(i.code == "EDGE_TARGET_UNKNOWN" for i in exc.value.issues)
 
 
 async def test_create_stamps_workflow_id_into_doc_id(service):

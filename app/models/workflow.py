@@ -65,9 +65,13 @@ class WorkflowEdge(BaseModel):
     Field names ``sourceHandle`` and ``targetHandle`` are camelCase to match
     the React Flow JSON exactly — no rename layer between the React
     serializer and the Mongo document.
+
+    ``extra='allow'`` so React-side extensions like ``data.routingOffset``
+    (used by AdjustableEdge to persist the user-controlled bend point) are
+    preserved through validate → dump round-trips.
     """
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="allow")
 
     id: str = Field(min_length=1, max_length=128)
     source: str = Field(min_length=1, max_length=128, description="Source node id")
@@ -85,9 +89,16 @@ class WorkflowEdge(BaseModel):
 
 
 class WorkflowDoc(BaseModel):
-    """Complete workflow definition."""
+    """Complete workflow definition.
 
-    model_config = ConfigDict(extra="forbid")
+    ``extra='allow'`` so the React Workflow Builder can attach UI-only
+    fields at the doc envelope (``version`` for client-side OCC tracking,
+    ``variables`` for the system/runtime variable context, ``flowVariables``
+    for user-defined variables) without the server losing or rejecting them.
+    The server's authoritative current_version lives on ``WorkflowMeta``.
+    """
+
+    model_config = ConfigDict(extra="allow")
 
     id: str = Field(
         min_length=1,

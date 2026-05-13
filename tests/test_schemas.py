@@ -162,6 +162,45 @@ def test_workflow_edge_optional_handles_default_to_none():
     assert e.targetHandle is None
 
 
+def test_workflow_doc_preserves_react_extra_fields():
+    """The React Workflow Builder attaches ``version``, ``variables``,
+    ``flowVariables`` to the doc envelope. ``extra='allow'`` round-trips them."""
+    payload = {
+        "id": "wf_react",
+        "name": "From React",
+        "nodes": [],
+        "edges": [],
+        "version": 7,
+        "variables": {
+            "system": {"userQuery": "", "attachments": [], "files": [], "humanInput": ""},
+            "runtime": {"workflowMetaData": {"workflowId": "", "agentName": ""}},
+        },
+        "flowVariables": [],
+    }
+    doc = WorkflowDoc.model_validate(payload)
+    dumped = doc.model_dump(mode="json")
+    assert dumped["version"] == 7
+    assert dumped["variables"]["system"]["userQuery"] == ""
+    assert dumped["flowVariables"] == []
+
+
+def test_workflow_edge_preserves_data_extra_field():
+    """React's AdjustableEdge persists user-controlled bend points via
+    ``edge.data.routingOffset``. Edge ``extra='allow'`` round-trips it."""
+    e = WorkflowEdge.model_validate(
+        {
+            "id": "e1",
+            "source": "a",
+            "target": "b",
+            "sourceHandle": None,
+            "targetHandle": None,
+            "data": {"routingOffset": {"x": 12.5, "y": -8}},
+        }
+    )
+    dumped = e.model_dump()
+    assert dumped["data"] == {"routingOffset": {"x": 12.5, "y": -8}}
+
+
 def test_workflow_doc_default_empty_collections():
     doc = WorkflowDoc.model_validate({"id": "x", "name": "Empty"})
     assert doc.nodes == []

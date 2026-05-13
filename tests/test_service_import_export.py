@@ -82,7 +82,8 @@ async def test_import_bare_doc_creates_new_workflow(services):
     response = await ie.import_workflow(_bare_doc_payload(), actor_id="alice")
     assert response.created is True
     assert response.version == 1
-    assert response.workflow_id.startswith("wf_")
+    # workflow_id is a UUID4 string (36 chars with hyphens).
+    assert len(response.workflow_id) == 36 and response.workflow_id.count("-") == 4
     assert response.validation.valid is True
 
 

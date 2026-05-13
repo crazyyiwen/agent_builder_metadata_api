@@ -69,15 +69,23 @@ def _doc(name: str = "Demo") -> dict:
 
 
 def _invalid_doc(name: str = "Bad") -> dict:
-    """No Output node — fails default validator."""
+    """Edge target references a non-existent node — fails default validation
+    with a hard error so create/PUT reject it."""
     return {
         "id": "wf_caller",
         "name": name,
         "nodes": [
             {"id": "s", "type": "start", "position": {"x": 0, "y": 0},
              "data": {"name": "S", "config": {}}},
+            {"id": "o", "type": "output", "position": {"x": 100, "y": 0},
+             "data": {"name": "O", "config": {}}},
         ],
-        "edges": [],
+        "edges": [
+            {"id": "e1", "source": "s", "target": "o",
+             "sourceHandle": None, "targetHandle": None},
+            {"id": "e2", "source": "s", "target": "ghost_node",
+             "sourceHandle": None, "targetHandle": None},
+        ],
     }
 
 
@@ -102,7 +110,7 @@ async def test_create_with_invalid_doc_returns_422_with_issues(client):
     assert resp.status_code == 422
     body = resp.json()
     assert body["code"] == "VALIDATION_FAILED"
-    assert any(i["code"] == "OUTPUT_NODE_MISSING" for i in body["issues"])
+    assert any(i["code"] == "EDGE_TARGET_UNKNOWN" for i in body["issues"])
 
 
 async def test_create_without_doc_uses_default_skeleton(client):
@@ -285,7 +293,7 @@ async def test_validate_endpoint_reports_issues(client):
     resp = await client.post("/api/workflows/validate", json=_invalid_doc())
     body = resp.json()
     assert body["valid"] is False
-    assert any(i["code"] == "OUTPUT_NODE_MISSING" for i in body["issues"])
+    assert any(i["code"] == "EDGE_TARGET_UNKNOWN" for i in body["issues"])
 
 
 async def test_validate_existing_workflow(client):

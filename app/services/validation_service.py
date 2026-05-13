@@ -23,7 +23,26 @@ from typing import Iterable
 
 from app.models.common import ValidationIssue, ValidationResult, ValidationSeverity
 from app.models.summary import ValidationStatus, WorkflowSummary
-from app.models.workflow import WorkflowDoc
+from app.models.workflow import WorkflowDoc, WorkflowNode
+
+
+def _effective_node_type(node: WorkflowNode) -> str:
+    """Return the registry key used for graph-semantic checks.
+
+    Two storage conventions exist for the registry node-type key:
+
+    1. Server-native: ``node.type`` holds the key (``"start"``, ``"output"``).
+    2. React Flow integration: ``node.type`` is the renderer key
+       (``"dynamic"``) and the actual registry key lives in ``node.data.type``
+       (``NodeData`` has ``extra='allow'``).
+
+    Prefer ``data.type`` if present and non-empty; else fall back to
+    ``node.type``.
+    """
+    data_type = getattr(node.data, "type", None)
+    if isinstance(data_type, str) and data_type:
+        return data_type
+    return node.type
 
 
 # --------------------------- issue codes ---------------------------
@@ -107,9 +126,9 @@ def extract_summary(
     if validation is None:
         validation = validate_workflow(doc, cfg)
 
-    types = sorted({n.type for n in doc.nodes})
-    starts = sum(1 for n in doc.nodes if n.type == cfg.start_node_type)
-    outputs = sum(1 for n in doc.nodes if n.type == cfg.output_node_type)
+    types = sorted({_effective_node_type(n) for n in doc.nodes})
+    starts = sum(1 for n in doc.nodes if _effective_node_type(n) == cfg.start_node_type)
+    outputs = sum(1 for n in doc.nodes if _effective_node_type(n) == cfg.output_node_type)
     errors = sum(1 for i in validation.issues if i.severity is ValidationSeverity.ERROR)
     warnings = sum(1 for i in validation.issues if i.severity is ValidationSeverity.WARNING)
 
@@ -245,7 +264,7 @@ def _check_duplicate_edges(doc: WorkflowDoc) -> Iterable[ValidationIssue]:
 def _check_start_node(doc: WorkflowDoc, cfg: ValidatorConfig) -> Iterable[ValidationIssue]:
     if not cfg.require_start_node:
         return
-    starts = [n for n in doc.nodes if n.type == cfg.start_node_type]
+    starts = [n for n in doc.nodes if _effective_node_type(n) == cfg.start_node_type]
     if len(starts) > 1:
         yield _err(
             "nodes",
@@ -286,11 +305,14 @@ def _check_start_node(doc: WorkflowDoc, cfg: ValidatorConfig) -> Iterable[Valida
 
 
 def _check_output_node(doc: WorkflowDoc, cfg: ValidatorConfig) -> Iterable[ValidationIssue]:
+    """Missing Output is a WARNING, not an error: drafts should be saveable
+    before the user has wired the terminal node. Set ``require_output_node``
+    to False on the config to silence the warning entirely."""
     if not cfg.require_output_node:
         return
-    outputs = [n for n in doc.nodes if n.type == cfg.output_node_type]
+    outputs = [n for n in doc.nodes if _effective_node_type(n) == cfg.output_node_type]
     if not outputs:
-        yield _err(
+        yield _warn(
             "nodes",
             f"No '{cfg.output_node_type}' node found",
             IssueCode.OUTPUT_NODE_MISSING,
@@ -335,10 +357,11 @@ def _check_unknown_node_types(
     if cfg.known_node_types is None:
         return
     for i, node in enumerate(doc.nodes):
-        if node.type not in cfg.known_node_types:
+        effective = _effective_node_type(node)
+        if effective not in cfg.known_node_types:
             yield _warn(
                 f"nodes[{i}].type",
-                f"Unknown node type '{node.type}'",
+                f"Unknown node type {effective!r}",
                 IssueCode.NODE_TYPE_UNKNOWN,
             )
 

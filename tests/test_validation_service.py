@@ -279,7 +279,9 @@ def test_multiple_start_nodes_is_error():
 # --------------------------- output node ---------------------------
 
 
-def test_missing_output_node_is_error():
+def test_missing_output_node_is_warning_not_error():
+    """Missing Output is a warning so drafts can save before the user wires
+    the terminal node. Set ``require_output_node=False`` to silence entirely."""
     doc = _doc(
         nodes=[
             _node("s", type="start", name="S"),
@@ -288,8 +290,11 @@ def test_missing_output_node_is_error():
         edges=[_edge("e1", "s", "a")],
     )
     result = validate_workflow(doc)
-    assert IssueCode.OUTPUT_NODE_MISSING in _codes(result)
-    assert result.valid is False
+    issues = [i for i in result.issues if i.code == IssueCode.OUTPUT_NODE_MISSING]
+    assert len(issues) == 1
+    assert issues[0].severity is ValidationSeverity.WARNING
+    # Warning alone doesn't fail validation.
+    assert result.valid is True
 
 
 def test_missing_output_node_skipped_when_not_required():
@@ -521,6 +526,81 @@ def test_summary_reuses_provided_validation():
 
 
 # --------------------------- defaults sanity ---------------------------
+
+
+def test_validator_recognizes_start_via_data_type_react_convention():
+    """The React Workflow Builder uses ``node.type='dynamic'`` for every
+    node and stores the registry key in ``node.data.type``. Validator must
+    detect Start/Output via the effective-type fallback."""
+    doc = WorkflowDoc.model_validate(
+        {
+            "id": "wf_react",
+            "name": "From React",
+            "nodes": [
+                {
+                    "id": "n1",
+                    "type": "dynamic",
+                    "position": {"x": 0, "y": 0},
+                    "data": {"type": "start", "name": "S", "config": {}},
+                },
+                {
+                    "id": "n2",
+                    "type": "dynamic",
+                    "position": {"x": 200, "y": 0},
+                    "data": {"type": "output", "name": "O", "config": {}},
+                },
+            ],
+            "edges": [
+                {"id": "e1", "source": "n1", "target": "n2",
+                 "sourceHandle": None, "targetHandle": None}
+            ],
+        }
+    )
+    result = validate_workflow(doc)
+    # No START_NODE_MISSING / OUTPUT_NODE_MISSING — both detected via data.type.
+    assert IssueCode.START_NODE_MISSING not in _codes(result)
+    assert IssueCode.START_NODE_IMPLICIT not in _codes(result)
+    assert IssueCode.OUTPUT_NODE_MISSING not in _codes(result)
+    assert result.valid is True
+
+
+def test_validator_falls_back_to_node_type_when_data_type_missing():
+    """Pure server-shape docs (no data.type) still detect Start via node.type."""
+    doc = _doc(
+        nodes=[
+            _node("s", type="start", name="S"),
+            _node("o", type="output", name="O"),
+        ],
+        edges=[_edge("e1", "s", "o")],
+    )
+    result = validate_workflow(doc)
+    assert result.valid is True
+
+
+def test_summary_uses_effective_type():
+    """``WorkflowSummary.node_types`` must reflect the registry key, not
+    the renderer key (``'dynamic'``)."""
+    from app.services.validation_service import extract_summary
+    doc = WorkflowDoc.model_validate(
+        {
+            "id": "wf_react",
+            "name": "X",
+            "nodes": [
+                {"id": "n1", "type": "dynamic", "position": {"x": 0, "y": 0},
+                 "data": {"type": "start", "name": "S", "config": {}}},
+                {"id": "n2", "type": "dynamic", "position": {"x": 100, "y": 0},
+                 "data": {"type": "output", "name": "O", "config": {}}},
+            ],
+            "edges": [{"id": "e1", "source": "n1", "target": "n2",
+                       "sourceHandle": None, "targetHandle": None}],
+        }
+    )
+    s = extract_summary(doc)
+    assert s.node_types == ["output", "start"]
+    assert s.has_start_node is True
+    assert s.has_output_node is True
+    assert s.start_node_count == 1
+    assert s.output_node_count == 1
 
 
 def test_default_config_matches_documented_defaults():

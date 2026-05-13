@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 import secrets
 
 import pytest
@@ -85,16 +86,20 @@ async def _seed(repo: WorkflowRepository, **overrides) -> str:
 # --------------------------- create ---------------------------
 
 
+_UUID4_RE = re.compile(
+    r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+)
+
+
 async def test_generate_workflow_id_format():
     wid = generate_workflow_id()
-    assert wid.startswith("wf_")
-    assert len(wid) >= 12
+    assert _UUID4_RE.match(wid), f"not a UUID4: {wid!r}"
 
 
 async def test_create_assigns_generated_id_and_v1(db):
     repo = WorkflowRepository(db)
     meta = await repo.create(name="Demo", doc=_doc(), summary=_summary())
-    assert meta.workflow_id.startswith("wf_")
+    assert _UUID4_RE.match(meta.workflow_id)
     assert meta.current_version == 1
     assert meta.status is WorkflowStatus.DRAFT
 

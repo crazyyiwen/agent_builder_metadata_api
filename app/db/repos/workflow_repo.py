@@ -18,7 +18,7 @@ Key behaviors:
 from __future__ import annotations
 
 import re
-import secrets
+import uuid
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 
@@ -52,8 +52,13 @@ META_FIELDS = (
 
 
 def generate_workflow_id() -> str:
-    """``wf_<11 url-safe chars>``. ~64 bits of entropy; collision-resistant."""
-    return f"wf_{secrets.token_urlsafe(8)}"
+    """Standard UUID4 string (``xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx``).
+
+    36 chars, ~122 bits of entropy. Hyphens and hex digits are URL-safe and
+    pass the ``WorkflowMeta.workflow_id`` regex (first char is alphanumeric,
+    rest is alphanumeric or hyphen).
+    """
+    return str(uuid.uuid4())
 
 
 def _now() -> datetime:
